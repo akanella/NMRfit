@@ -10,7 +10,7 @@ magneticField = 4.48 # in mT
 isotope = 'Xe129' # choose between H1, H2, Xe129, Xe131, Xe133, Xe129m, Xe131m, Xe133m
 
 main_dir = '/Users/akanellako/Documents/NMR_data'
-fileName = 'fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.txt'
+fileName = 'fft-one_shot_0s_laseroff_120deg_full_polarisation.txt'
 
 def larmorFrequency(magneticField, isotope):
     if isotope == 'H1':
@@ -74,6 +74,7 @@ def main(dataDir, resultDir, fileName):
     except FileExistsError: pass
     os.chdir(resultDir)
 
+    fitFile = os.path.join(resultDir, 'fit_{}.csv'.format(fileName[:-4]))
     resultFile = os.path.join(resultDir, '{}.csv'.format(fileName[:-4]))
     resultGraph = os.path.join(resultDir, '{}.png'.format(fileName[:-4]))
 
@@ -91,6 +92,7 @@ def main(dataDir, resultDir, fileName):
     std = cDF.intensity.std()
     fitDF['SNR'] = fitDF.intensity.abs()/std
     fitDF['intensityUnc'] = fitDF.intensity/fitDF.SNR
+    fitDF.to_csv(fitFile, index = False)
 
     # Initialisation of model parameters
     init_mu = fLarmor
@@ -150,7 +152,6 @@ def main(dataDir, resultDir, fileName):
     plt.legend(loc='upper right')
     plt.xlabel("Frequence [Hz]")
     plt.ylabel("Intensity [a.u.]")
-    plt.show()
     plt.savefig(resultGraph)
 
 #%% Main
