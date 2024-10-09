@@ -78,15 +78,19 @@ def main(dataDir, resultDir, fileName):
     resultGraph = os.path.join(resultDir, '{}.png'.format(fileName[:-4]))
 
     inDF = pd.read_csv(dataFile, delimiter=' ', header=None)
-
     inDF.columns = ['frequency', 'intensity']
-    inDF['intensityUnc'] = inDF['intensity']**0.5
 
     fLarmor = larmorFrequency(magneticField, isotope)
     cog = int(fLarmor)*1e3
     fLarmor = fLarmor*1e3
 
-    fitDF = inDF[(inDF['frequency'] >= cog-5e3) & (inDF['frequency'] <= cog+5e3)]  
+    fitDF = inDF[(inDF['frequency'] >= cog-5e3) & (inDF['frequency'] <= cog+5e3)]
+    aDF = fitDF[(fitDF['frequency'] <= cog-2e3)]
+    bDF = fitDF[(fitDF['frequency'] >= cog+2e3)]
+    cDF = pd.concat([aDF, bDF])
+    std = cDF.intensity.std()
+    fitDF['SNR'] = fitDF.intensity.abs()/std
+    fitDF['intensityUnc'] = fitDF.intensity/fitDF.SNR
 
     # Initialisation of model parameters
     init_mu = fLarmor
@@ -109,11 +113,12 @@ def main(dataDir, resultDir, fileName):
     binPerHz = len(fitDF)/(fitDF.frequency.max()-fitDF.frequency.min())
     diff = fLarmor - modelDF.mu.Value.values[0]
 
+    # fit5sDF = fitDF.loc[(fitDF['frequency'] < upper5s)].std()
+
     # if modelDF.FWHM.Value.values[0] > 120.:
     #     lower5s = modelDF.mu.Value.values[0]-6*modelDF.FWHM.Value.values[0]
     #     upper5s = modelDF.mu.Value.values[0]+6*modelDF.FWHM.Value.values[0]
     #     fit5sDF = fitDF.loc[(fitDF['frequency'] > lower5s) & (fitDF['frequency'] < upper5s)].reset_index(drop = True)
-    #     fit5sDF = fitDF.loc[(fitDF['frequency'] > lower5s)].reset_index(drop = True)
     #     A5s = fit5sDF.intensity.sum()
     #     dA5s = A5s**0.5
     # else:
@@ -138,16 +143,15 @@ def main(dataDir, resultDir, fileName):
     resultDF.to_csv(resultFile, index = False)
 
     plt.figure(dpi = 200)
-    plt.errorbar(fitDF.frequency, fitDF.intensity, yerr=(fitDF.intensity)**0.5, label = "FFT", fmt='.', zorder=1)
-    plt.plot(fitDF.frequency.to_numpy(), model(fitDF.frequency.to_numpy()), label = "Fit", linestyle = "-", zorder=2)
-    plt.plot([fLarmor, fLarmor], [fitDF.intensity.min(), fitDF.intensity.max()], label = '$f_{L}$', linestyle='--')
-    plt.plot([modelDF.mu.Value.values[0], modelDF.mu.Value.values[0]], [fitDF.intensity.min(), fitDF.intensity.max()], label = 'Fit CoG', linestyle='--')
-    # plt.plot([lower5s, lower5s], [fitDF.intensity.min(), fitDF.intensity.max()], linestyle=':', color='k')
+    plt.errorbar(fitDF.frequency, fitDF.intensity, yerr=(fitDF.intensityUnc), label = "FFT", fmt='.', zorder=5)
+    plt.plot(fitDF.frequency.to_numpy(), model(fitDF.frequency.to_numpy()), label = "Fit", linestyle = "-", zorder=3)
+    plt.plot([fLarmor, fLarmor], [fitDF.intensity.min(), fitDF.intensity.max()], label = '$f_{L}$', linestyle='--', zorder=1)
+    plt.plot([modelDF.mu.Value.values[0], modelDF.mu.Value.values[0]], [fitDF.intensity.min(), fitDF.intensity.max()], label = 'Fit CoG', linestyle='--', zorder=1)
     plt.legend(loc='upper right')
     plt.xlabel("Frequence [Hz]")
     plt.ylabel("Intensity [a.u.]")
+    plt.show()
     plt.savefig(resultGraph)
-
 
 #%% Main
 
