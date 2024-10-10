@@ -5,7 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as cts
 import satlas as sat
-from scipy.integrate import simps
 from uncertainties import ufloat
 
 magneticField = 4.48 # in mT
@@ -130,7 +129,7 @@ def main(dataDir, resultDir, fileName):
     # else:
     #     A5s = np.nan
     #     dA5s = np.nan
-    print(simps(fitDF.intensity, fitDF.frequency))
+
     if isotope != 'H1':
         print('con')
 
