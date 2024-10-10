@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as cts
 import satlas as sat
+from scipy.integrate import simps
 from uncertainties import ufloat
 
 magneticField = 4.48 # in mT
@@ -51,13 +52,13 @@ def NMRPeakModel(x, par):
 
     A = par[0]
     mu = par[1]
-    FWHM = par[2]
+    gamma = par[2]
     a0 = par[3]
     a1 = par[4]
 
     linear = (a1 * x) + a0
 
-    lorentzian = A * (FWHM/2) / ( math.pi * ((x - mu)**2) + ((FWHM/2)**2) )
+    lorentzian = (1/math.pi) * A * ((gamma) / (((x - mu)**2) + ((gamma)**2)))
 
 
     return linear + lorentzian
@@ -98,17 +99,17 @@ def main(dataDir, resultDir, fileName):
 
     # Initialisation of model parameters
     init_mu = fLarmor.nominal_value
-    init_fwhm = 120.
-    init_A = inDF.intensity.max()*init_fwhm*0.5
+    init_gamma = 120.
+    init_A = inDF.intensity.max()*init_gamma*0.5
     init_a1 = (fitDF.intensity.iloc[-1]-fitDF.intensity.iloc[0])/(fitDF.frequency.iloc[-1]-fitDF.frequency.iloc[0])
     init_a0 = inDF.intensity.min()
-    init = [init_A, init_mu, init_fwhm, init_a0, init_a1]
+    init = [init_A, init_mu, init_gamma, init_a0, init_a1]
 
-    model = sat.MiscModel(NMRPeakModel, init, ['A', 'mu', 'FWHM', 'a0', 'a1'])
+    model = sat.MiscModel(NMRPeakModel, init, ['A', 'mu', 'gamma', 'a0', 'a1'])
     model.set_boundaries({'a0': {'min': 0.},
                             'a1': {'max': 0.},
                             'A': {'min': 0.},
-                            'FWHM': {'min': 0.},
+                            'gamma': {'min': 0.},
                             'mu': {'min': 0.}})
 
     success, message = sat.chisquare_fit(model, fitDF.frequency.to_numpy(), fitDF.intensity.to_numpy(), yerr=fitDF.intensityUnc.to_numpy())
@@ -129,16 +130,18 @@ def main(dataDir, resultDir, fileName):
     # else:
     #     A5s = np.nan
     #     dA5s = np.nan
-
+    print(simps(fitDF.intensity, fitDF.frequency))
     if isotope != 'H1':
         print('con')
 
-    A3s = np.nan
+    A3s = fitDF[(fitDF['frequency'] >= 52000) & (fitDF['frequency'] <= 54000)]
+    A3s = A3s.intensity.sum()
+    # A3s = np.nan
     dA3s = np.nan
     resultDF = pd.DataFrame([[A3s, dA3s,
         modelDF.A.Value.values[0]*binPerHz, modelDF.A.Uncertainty.values[0]*binPerHz,
         modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0],
-        modelDF.FWHM.Value.values[0], modelDF.FWHM.Uncertainty.values[0],
+        2*modelDF.gamma.Value.values[0], 2*modelDF.gamma.Uncertainty.values[0],
         modelDF.a0.Value.values[0], modelDF.a0.Uncertainty.values[0],
         modelDF.a1.Value.values[0], modelDF.a1.Uncertainty.values[0],
         fLarmor.nominal_value, fLarmor.std_dev, diff.nominal_value, diff.std_dev, maxInt,
@@ -146,7 +149,7 @@ def main(dataDir, resultDir, fileName):
         columns=['A3s', 'dA3s','A', 'dA',
                 'mu', 'dmu', 'FWHM', 'dFWHM', 
                 'a0', 'da0', 'a1', 'da1',
-                'fLarmor', 'dFlarmor', 'diffLarmor', 'ddiffLarmor', 'maxIntensity',
+                'fLarmor', 'dfLarmor', 'diffLarmor', 'ddiffLarmor', 'maxIntensity',
                 'Chi2', 'NDoF', 'Red. Chi2'])
 
     resultDF = resultDF.reset_index(drop = True)
@@ -158,8 +161,8 @@ def main(dataDir, resultDir, fileName):
     plt.plot([fLarmor.nominal_value, fLarmor.nominal_value], [fitDF.intensity.min(), fitDF.intensity.max()], label = '$f_{L}$', linestyle='--', zorder=1)
     plt.plot([modelDF.mu.Value.values[0], modelDF.mu.Value.values[0]], [fitDF.intensity.min(), fitDF.intensity.max()], label = 'Fit CoG', linestyle='--', zorder=1)
     plt.legend(loc='upper right')
-    plt.xlabel("Frequence [Hz]")
-    plt.ylabel("Intensity [a.u.]")
+    plt.xlabel('Frequence [Hz]')
+    plt.ylabel('Intensity [a.u.]')
     plt.savefig(resultGraph)
 
 #%% Main
