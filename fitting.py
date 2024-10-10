@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as cts
 import satlas as sat
+from uncertainties import ufloat
 
 magneticField = 4.48 # in mT
 isotope = 'Xe129' # choose between H1, H2, Xe129, Xe131, Xe133, Xe129m, Xe131m, Xe133m
@@ -14,35 +15,35 @@ fileName = 'fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.txt'
 
 def larmorFrequency(magneticField, isotope):
     if isotope == 'H1':
-        magneticMoment = 2.79284734 # in nuclear magnetons
+        magneticMoment = uflaot(2.792847351, 0.000000009)  # in nuclear magnetons
         nucSpin = 1/2
     elif isotope == 'H2':
-        magneticMoment = 0.857438228 # in nuclear magnetons
+        magneticMoment = ufloat(0.857438231, 0.000000005) # in nuclear magnetons
         nucSpin = 1
     elif isotope == 'Xe129':
-        magneticMoment = -0.7779763 # in nuclear magnetons
+        magneticMoment = ufloat(-0.777961, 0.000016) # in nuclear magnetons
         nucSpin = 1/2
     elif isotope == 'Xe131':
-        magneticMoment = 0.691862 # in nuclear magnetons
+        magneticMoment = ufloat(+0.691845, 0.000007) # in nuclear magnetons
         nucSpin = 3/2
     elif isotope == 'Xe133':
-        magneticMoment = +0.81335 # in nuclear magnetons
+        magneticMoment = ufloat(+0.81335, 0.00007) # in nuclear magnetons
         nucSpin = 3/2
     elif isotope == 'Xe129m':
-        magneticMoment = -0.891223 # in nuclear magnetons
+        magneticMoment = ufloat(-0.891170, 0.00001010) # in nuclear magnetons
         nucSpin = 11/2
     elif isotope == 'Xe131m':
-        magneticMoment = -0.994048 # in nuclear magnetons
+        magneticMoment = ufloat(-0.993989, 0.000012) # in nuclear magnetons
         nucSpin = 11/2
     elif isotope == 'Xe133m':
-        magneticMoment = -1.08241 # in nuclear magnetons
+        magneticMoment = ufloat(-1.08241, 0.00015) # in nuclear magnetons
         nucSpin = 11/2
 
     gFactor = magneticMoment/nucSpin
 
-    gyromagneticRatio = (cts.physical_constants['nuclear magneton'][0]/cts.physical_constants['reduced Planck constant'][0]) * gFactor * (1e-6)/(2*math.pi)
+    gyromagneticRatio = (ufloat(cts.physical_constants['nuclear magneton'][0], cts.physical_constants['nuclear magneton'][2])/ufloat(cts.physical_constants['reduced Planck constant'][0], cts.physical_constants['reduced Planck constant'][2])) * gFactor * (1e-6)/(2*math.pi)
 
-    larmorFrequency = gyromagneticRatio * magneticField
+    larmorFrequency = gyromagneticRatio * ufloat(magneticField, 0.005)
 
     return abs(larmorFrequency) 
 
@@ -82,7 +83,7 @@ def main(dataDir, resultDir, fileName):
     inDF.columns = ['frequency', 'intensity']
 
     fLarmor = larmorFrequency(magneticField, isotope)
-    cog = int(fLarmor)*1e3
+    cog = int(fLarmor.nominal_value)*1e3
     fLarmor = fLarmor*1e3
 
     fitDF = inDF[(inDF['frequency'] >= cog-5e3) & (inDF['frequency'] <= cog+5e3)]
@@ -96,7 +97,7 @@ def main(dataDir, resultDir, fileName):
     fitDF.to_csv(fitFile, index = False)
 
     # Initialisation of model parameters
-    init_mu = fLarmor
+    init_mu = fLarmor.nominal_value
     init_fwhm = 300.
     init_A = inDF.intensity.max()*init_fwhm*0.5
     init_a1 = -0.9
@@ -114,7 +115,7 @@ def main(dataDir, resultDir, fileName):
     modelDF = model.get_result_frame()
 
     binPerHz = len(fitDF)/(fitDF.frequency.max()-fitDF.frequency.min())
-    diff = fLarmor - modelDF.mu.Value.values[0]
+    diff = fLarmor - ufloat(modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0],)
     maxInt = model(fitDF.frequency.values[0])
 
     # fit5sDF = fitDF.loc[(fitDF['frequency'] < upper5s)].std()
@@ -131,20 +132,22 @@ def main(dataDir, resultDir, fileName):
 
 
     if isotope != 'H1':
-        
+        print('con')
 
     A3s = np.nan
     dA3s = np.nan
     resultDF = pd.DataFrame([[A3s, dA3s,
         modelDF.A.Value.values[0]*binPerHz, modelDF.A.Uncertainty.values[0]*binPerHz,
-        modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0], diff, maxInt,
+        modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0],
         modelDF.FWHM.Value.values[0], modelDF.FWHM.Uncertainty.values[0],
         modelDF.a0.Value.values[0], modelDF.a0.Uncertainty.values[0],
         modelDF.a1.Value.values[0], modelDF.a1.Uncertainty.values[0],
+        fLarmor.nominal_value, fLarmor.std_dev, diff.nominal_value, diff.std_dev, maxInt,
         modelDF.Chisquare.values[0], modelDF.NDoF.values[0], float(modelDF.Chisquare.values[0]/modelDF.NDoF.values[0])]],
         columns=['A3s', 'dA3s','A', 'dA',
-                'mu', 'dmu', 'diffLarmor', 'maxIntensity', 'FWHM', 'dFWHM',
+                'mu', 'dmu', 'FWHM', 'dFWHM', 
                 'a0', 'da0', 'a1', 'da1',
+                'fLarmor', 'dFlarmor', 'diffLarmor', 'ddiffLarmor', 'maxIntensity',
                 'Chi2', 'NDoF', 'Red. Chi2'])
 
     resultDF = resultDF.reset_index(drop = True)
@@ -153,7 +156,7 @@ def main(dataDir, resultDir, fileName):
     plt.figure(dpi = 200)
     plt.errorbar(fitDF.frequency, fitDF.intensity, yerr=(fitDF.intensityUnc), label = "FFT", fmt='.', zorder=5)
     plt.plot(fitDF.frequency.to_numpy(), model(fitDF.frequency.to_numpy()), label = "Fit", linestyle = "-", zorder=3)
-    plt.plot([fLarmor, fLarmor], [fitDF.intensity.min(), fitDF.intensity.max()], label = '$f_{L}$', linestyle='--', zorder=1)
+    plt.plot([fLarmor.nominal_value, fLarmor.nominal_value], [fitDF.intensity.min(), fitDF.intensity.max()], label = '$f_{L}$', linestyle='--', zorder=1)
     plt.plot([modelDF.mu.Value.values[0], modelDF.mu.Value.values[0]], [fitDF.intensity.min(), fitDF.intensity.max()], label = 'Fit CoG', linestyle='--', zorder=1)
     plt.legend(loc='upper right')
     plt.xlabel("Frequence [Hz]")
