@@ -10,12 +10,12 @@ from uncertainties import ufloat
 magneticField = 4.48 # in mT
 isotope = 'Xe129' # choose between H1, H2, Xe129, Xe131, Xe133, Xe129m, Xe131m, Xe133m
 
-main_dir = '/Users/akanellako/Documents/NMR_data'
+main_dir = 'C:\\Users\\quentin.rogliard\\OneDrive - HESSO\\Documents\\GitHub\\NMRfit'
 fileName = 'fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.txt'
 
 def larmorFrequency(magneticField, isotope):
     if isotope == 'H1':
-        magneticMoment = uflaot(2.792847351, 0.000000009)  # in nuclear magnetons
+        magneticMoment = ufloat(2.792847351, 0.000000009)  # in nuclear magnetons
         nucSpin = 1/2
     elif isotope == 'H2':
         magneticMoment = ufloat(0.857438231, 0.000000005) # in nuclear magnetons
@@ -117,6 +117,19 @@ def main(dataDir, resultDir, fileName):
     binPerHz = len(fitDF)/(fitDF.frequency.max()-fitDF.frequency.min())
     diff = fLarmor - ufloat(modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0],)
     maxInt = model(fitDF.frequency.values[0])
+    
+    #Polarisation Calculation
+    
+    P_H1 = 4.24e-9
+    A_H1 = 1.1e6/1000
+    GR_H1 = 42.57638474
+    Nb_at_H1 = 3.73544E+23
+    I_H1 = 1/2
+    GR_Xe129 = 11.777
+    Nb_at_Xe129 = 3.55525E+18
+    I_Xe129 = 1/2
+    
+    Polarisation = P_H1 * (modelDF.A.Value.values[0]/A_H1) * (Nb_at_H1 / Nb_at_Xe129) * (GR_H1 / GR_Xe129) * (I_H1 / I_Xe129) 
 
     # fit5sDF = fitDF.loc[(fitDF['frequency'] < upper5s)].std()
 
@@ -142,12 +155,12 @@ def main(dataDir, resultDir, fileName):
         modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0],
         2*modelDF.gamma.Value.values[0], 2*modelDF.gamma.Uncertainty.values[0],
         modelDF.a0.Value.values[0], modelDF.a0.Uncertainty.values[0],
-        modelDF.a1.Value.values[0], modelDF.a1.Uncertainty.values[0],
+        modelDF.a1.Value.values[0], modelDF.a1.Uncertainty.values[0], Polarisation,
         fLarmor.nominal_value, fLarmor.std_dev, diff.nominal_value, diff.std_dev, maxInt,
         modelDF.Chisquare.values[0], modelDF.NDoF.values[0], float(modelDF.Chisquare.values[0]/modelDF.NDoF.values[0])]],
         columns=['A3s', 'dA3s','A', 'dA',
                 'mu', 'dmu', 'FWHM', 'dFWHM', 
-                'a0', 'da0', 'a1', 'da1',
+                'a0', 'da0', 'a1', 'da1','Polarisation',
                 'fLarmor', 'dfLarmor', 'diffLarmor', 'ddiffLarmor', 'maxIntensity',
                 'Chi2', 'NDoF', 'Red. Chi2'])
 
