@@ -10,7 +10,7 @@ magneticField = 4.48 # in mT
 isotope = 'Xe129' # choose between H1, H2, Xe129, Xe131, Xe133, Xe129m, Xe131m, Xe133m
 
 main_dir = '/Users/akanellako/Documents/NMR_data'
-fileName = 'fft-one_shot_0s_laseroff_120deg_full_polarisation.txt'
+fileName = 'fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.txt'
 
 def larmorFrequency(magneticField, isotope):
     if isotope == 'H1':
@@ -86,6 +86,7 @@ def main(dataDir, resultDir, fileName):
     fLarmor = fLarmor*1e3
 
     fitDF = inDF[(inDF['frequency'] >= cog-5e3) & (inDF['frequency'] <= cog+5e3)]
+    fitDF['intensity'] = fitDF['intensity']/1e3
     aDF = fitDF[(fitDF['frequency'] <= cog-2e3)]
     bDF = fitDF[(fitDF['frequency'] >= cog+2e3)]
     cDF = pd.concat([aDF, bDF])
@@ -114,6 +115,7 @@ def main(dataDir, resultDir, fileName):
 
     binPerHz = len(fitDF)/(fitDF.frequency.max()-fitDF.frequency.min())
     diff = fLarmor - modelDF.mu.Value.values[0]
+    maxInt = model(fitDF.frequency.values[0])
 
     # fit5sDF = fitDF.loc[(fitDF['frequency'] < upper5s)].std()
 
@@ -127,17 +129,21 @@ def main(dataDir, resultDir, fileName):
     #     A5s = np.nan
     #     dA5s = np.nan
 
+
+    if isotope != 'H1':
+        
+
     A3s = np.nan
     dA3s = np.nan
     resultDF = pd.DataFrame([[A3s, dA3s,
         modelDF.A.Value.values[0]*binPerHz, modelDF.A.Uncertainty.values[0]*binPerHz,
-        modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0], diff,
+        modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0], diff, maxInt,
         modelDF.FWHM.Value.values[0], modelDF.FWHM.Uncertainty.values[0],
         modelDF.a0.Value.values[0], modelDF.a0.Uncertainty.values[0],
         modelDF.a1.Value.values[0], modelDF.a1.Uncertainty.values[0],
         modelDF.Chisquare.values[0], modelDF.NDoF.values[0], float(modelDF.Chisquare.values[0]/modelDF.NDoF.values[0])]],
         columns=['A3s', 'dA3s','A', 'dA',
-                'mu', 'dmu', 'diffLarmor', 'FWHM', 'dFWHM',
+                'mu', 'dmu', 'diffLarmor', 'maxIntensity', 'FWHM', 'dFWHM',
                 'a0', 'da0', 'a1', 'da1',
                 'Chi2', 'NDoF', 'Red. Chi2'])
 
