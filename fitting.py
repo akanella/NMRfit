@@ -98,9 +98,9 @@ def main(dataDir, resultDir, fileName):
 
     # Initialisation of model parameters
     init_mu = fLarmor.nominal_value
-    init_fwhm = 300.
+    init_fwhm = 120.
     init_A = inDF.intensity.max()*init_fwhm*0.5
-    init_a1 = -0.9
+    init_a1 = (fitDF.intensity.iloc[-1]-fitDF.intensity.iloc[0])/(fitDF.frequency.iloc[-1]-fitDF.frequency.iloc[0])
     init_a0 = inDF.intensity.min()
     init = [init_A, init_mu, init_fwhm, init_a0, init_a1]
 
@@ -129,7 +129,6 @@ def main(dataDir, resultDir, fileName):
     # else:
     #     A5s = np.nan
     #     dA5s = np.nan
-
 
     if isotope != 'H1':
         print('con')
