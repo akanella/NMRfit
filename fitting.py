@@ -8,13 +8,11 @@ import satlas as sat
 from uncertainties import ufloat
 import uncertainties.unumpy as unp
 
-#magneticField = 4.48 # in mT
 magneticField = 4.48 # in mT
-
 isotope = 'Xe129' # choose between H1, H2, Xe129, Xe131, Xe133, Xe129m, Xe131m, Xe133m
 
-main_dir = 'C:\\Users\\quentin.rogliard\\OneDrive - HESSO\\Documents\\GitHub\\NMRfit'
-# main_dir = '/Users/akanellako/Documents/NMR_data'
+# main_dir = 'C:\\Users\\quentin.rogliard\\OneDrive - HESSO\\Documents\\GitHub\\NMRfit'
+main_dir = '/Users/akanellako/Documents/NMR_data'
 fileName = 'fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.txt'
 
 def gyromagneticRatio(isotope):
@@ -123,18 +121,18 @@ def main(dataDir, resultDir, fileName):
     fitDF['SNR'] = fitDF.intensity.abs()/std
     fitDF['intensityUnc'] = fitDF.intensity/fitDF.SNR
     fitDF.to_csv(fitFile, index = False)
+    modelFrequency = np.arange(fitDF.frequency.min(), fitDF.frequency.max()+50, 50)
 
     # Initialisation of model parameters
     init_mu = fLarmor.nominal_value
     init_gamma = 120.
-    init_A = inDF.intensity.max()*init_gamma*0.5
+    init_A = inDF.intensity.max()*2*init_gamma*1e-3
     init_a1 = (fitDF.intensity.iloc[-1]-fitDF.intensity.iloc[0])/(fitDF.frequency.iloc[-1]-fitDF.frequency.iloc[0])
     init_a0 = inDF.intensity.min()
     init = [init_A, init_mu, init_gamma, init_a0, init_a1]
 
     model = sat.MiscModel(NMRPeakModel, init, ['A', 'mu', 'gamma', 'a0', 'a1'])
     model.set_boundaries({'a0': {'min': 0.},
-                            'a1': {'max': 0.},
                             'A': {'min': 0.},
                             'gamma': {'min': 60.},
                             'mu': {'min': 0.}})
@@ -157,11 +155,12 @@ def main(dataDir, resultDir, fileName):
         gyromagneticRatio_H1 = gyromagneticRatio('H1')[0].nominal_value
         nbAtoms_H1 = 2 * volume * (1/waterMolarMass) * ufloat(cts.physical_constants['Avogadro constant'][0], cts.physical_constants['Avogadro constant'][2])
         nucSpin_H1 = gyromagneticRatio('H1')[1]
-        gyromagneticRatio_Xe129 = gyromagneticRatio(isotope)[0].nominal_value
-        nbAtoms_Xe129 = nbAtomsIdealGas(pressure, volume, temperature)
-        nucSpin_Xe129 = gyromagneticRatio(isotope)[1]
-        
-        polarisation = polarisation_H1 * (modelDF.A.Value.values[0]/A_H1) * (nbAtoms_H1 / nbAtoms_Xe129) * (gyromagneticRatio_H1 / gyromagneticRatio_Xe129) * (nucSpin_H1 / nucSpin_Xe129) 
+        gyromagneticRatio_isotope = gyromagneticRatio(isotope)[0].nominal_value
+        nbAtoms_isotope = nbAtomsIdealGas(pressure, volume, temperature)
+        nucSpin_isotope = gyromagneticRatio(isotope)[1]
+
+        polarisation = polarisation_H1 * (modelDF.A.Value.values[0]/A_H1) * (nbAtoms_H1 / nbAtoms_isotope) * (gyromagneticRatio_H1 / gyromagneticRatio_isotope) * (nucSpin_H1 / nucSpin_isotope) 
+        polarisation = abs(polarisation)
     else:
         polarisation = ufloat(np.nan, np.nan)
 
@@ -175,7 +174,9 @@ def main(dataDir, resultDir, fileName):
         A3s = np.nan
         dA3s = np.nan
 
-    resultDF = pd.DataFrame([[A3s, dA3s,
+    resultDF = pd.DataFrame([[magneticField, isotope, gyromagneticRatio(isotope)[1],
+        gyromagneticRatio(isotope)[0].nominal_value, gyromagneticRatio(isotope)[0].std_dev,
+        A3s, dA3s,
         modelDF.A.Value.values[0]*binPerHz, modelDF.A.Uncertainty.values[0]*binPerHz,
         modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0],
         2*modelDF.gamma.Value.values[0], 2*modelDF.gamma.Uncertainty.values[0],
@@ -183,7 +184,8 @@ def main(dataDir, resultDir, fileName):
         modelDF.a1.Value.values[0], modelDF.a1.Uncertainty.values[0],
         fLarmor.nominal_value, fLarmor.std_dev, diff.nominal_value, diff.std_dev, maxInt, polarisation.nominal_value, polarisation.std_dev,
         modelDF.Chisquare.values[0], modelDF.NDoF.values[0], float(modelDF.Chisquare.values[0]/modelDF.NDoF.values[0])]],
-        columns=['A3s', 'dA3s','A', 'dA',
+        columns=['Bo', 'isotope', 'I', 'gamma/2pi', 'dgamma/2pi', 
+                'A3s', 'dA3s','A', 'dA',
                 'mu', 'dmu', 'FWHM', 'dFWHM', 
                 'a0', 'da0', 'a1', 'da1',
                 'fLarmor', 'dfLarmor', 'diffLarmor', 'ddiffLarmor', 'maxIntensity', 'polarisation', 'dpolarisation',
@@ -193,8 +195,8 @@ def main(dataDir, resultDir, fileName):
     resultDF.to_csv(resultFile, index = False)
 
     plt.figure(dpi = 200)
-    plt.errorbar(fitDF.frequency, fitDF.intensity, yerr=(fitDF.intensityUnc), label = "FFT", fmt='.', zorder=5)
-    plt.plot(fitDF.frequency.to_numpy(), model(fitDF.frequency.to_numpy()), label = "Fit", linestyle = "-", zorder=3)
+    plt.errorbar(fitDF.frequency, fitDF.intensity, yerr=(fitDF.intensityUnc), label = 'FFT', fmt='.', zorder=5)
+    plt.plot(modelFrequency, model(modelFrequency), label = 'Fit', linestyle = '-', zorder=3)
     plt.plot([fLarmor.nominal_value, fLarmor.nominal_value], [fitDF.intensity.min(), fitDF.intensity.max()], label = '$f_{L}$', linestyle='--', zorder=1)
     plt.plot([modelDF.mu.Value.values[0], modelDF.mu.Value.values[0]], [fitDF.intensity.min(), fitDF.intensity.max()], label = 'Fit CoG', linestyle='--', zorder=1)
     plt.legend(loc='upper right')

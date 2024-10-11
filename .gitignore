@@ -21,3 +21,11 @@ result/fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A/fft-TEST5_spheric
 /result
 result/fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A/fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.png
 result/fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A/fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.csv
+result/fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A/fit_fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.csv
+result/fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A/fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.png
+result/fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A/fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.csv
+fit_T1/fit_T1.png
+fit_T1/fit_T1.csv
+fit_T1.py
+data/fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.txt
+/result
