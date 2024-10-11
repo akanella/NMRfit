@@ -8,11 +8,13 @@ import satlas as sat
 from uncertainties import ufloat
 import uncertainties.unumpy as unp
 
+#magneticField = 4.48 # in mT
 magneticField = 4.48 # in mT
+
 isotope = 'Xe129' # choose between H1, H2, Xe129, Xe131, Xe133, Xe129m, Xe131m, Xe133m
 
-# main_dir = 'C:\\Users\\quentin.rogliard\\OneDrive - HESSO\\Documents\\GitHub\\NMRfit'
-main_dir = '/Users/akanellako/Documents/NMR_data'
+main_dir = 'C:\\Users\\quentin.rogliard\\OneDrive - HESSO\\Documents\\GitHub\\NMRfit'
+# main_dir = '/Users/akanellako/Documents/NMR_data'
 fileName = 'fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.txt'
 
 def gyromagneticRatio(isotope):
@@ -134,7 +136,7 @@ def main(dataDir, resultDir, fileName):
     model.set_boundaries({'a0': {'min': 0.},
                             'a1': {'max': 0.},
                             'A': {'min': 0.},
-                            'gamma': {'min': 0.},
+                            'gamma': {'min': 60.},
                             'mu': {'min': 0.}})
 
     success, message = sat.chisquare_fit(model, fitDF.frequency.to_numpy(), fitDF.intensity.to_numpy(), yerr=fitDF.intensityUnc.to_numpy())
@@ -151,15 +153,17 @@ def main(dataDir, resultDir, fileName):
         temperature = 300 # in Kelvin
         volume = sphereVolume(ufloat(1.1, 0.005)) # in cm2, radius in cm
         polarisation_H1 = protonThermalPolarisation(1.25, temperature)
-        A_H1 = 1.1e6/1000
+        A_H1 = ufloat(np.mean([1296.2079525436134, 1208.850679785642]),np.std([1296.2079525436134, 1208.850679785642]))
         gyromagneticRatio_H1 = gyromagneticRatio('H1')[0].nominal_value
         nbAtoms_H1 = 2 * volume * (1/waterMolarMass) * ufloat(cts.physical_constants['Avogadro constant'][0], cts.physical_constants['Avogadro constant'][2])
         nucSpin_H1 = gyromagneticRatio('H1')[1]
         gyromagneticRatio_Xe129 = gyromagneticRatio(isotope)[0].nominal_value
         nbAtoms_Xe129 = nbAtomsIdealGas(pressure, volume, temperature)
         nucSpin_Xe129 = gyromagneticRatio(isotope)[1]
-
+        
         polarisation = polarisation_H1 * (modelDF.A.Value.values[0]/A_H1) * (nbAtoms_H1 / nbAtoms_Xe129) * (gyromagneticRatio_H1 / gyromagneticRatio_Xe129) * (nucSpin_H1 / nucSpin_Xe129) 
+    else:
+        polarisation = ufloat(np.nan, np.nan)
 
     if 2*modelDF.gamma.Value.values[0] > 120.:
         lower3s = modelDF.mu.Value.values[0]-6*modelDF.gamma.Value.values[0]
