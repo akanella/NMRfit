@@ -73,8 +73,6 @@ def protonThermalPolarisation(magneticField, temperature):
 
     return polarisation
 
-# def polarisation()
-
 def NMRPeakModel(x, par):
 
     A = par[0]
@@ -162,7 +160,6 @@ def main(dataDir, resultDir, fileName):
         nucSpin_Xe129 = gyromagneticRatio(isotope)[1]
 
         polarisation = polarisation_H1 * (modelDF.A.Value.values[0]/A_H1) * (nbAtoms_H1 / nbAtoms_Xe129) * (gyromagneticRatio_H1 / gyromagneticRatio_Xe129) * (nucSpin_H1 / nucSpin_Xe129) 
-        print(polarisation)
 
     if 2*modelDF.gamma.Value.values[0] > 120.:
         lower3s = modelDF.mu.Value.values[0]-6*modelDF.gamma.Value.values[0]
@@ -174,9 +171,6 @@ def main(dataDir, resultDir, fileName):
         A3s = np.nan
         dA3s = np.nan
 
-    # Aint = fitDF[(fitDF['frequency'] >= 52000) & (fitDF['frequency'] <= 54000)]
-    # Aint = A3s.intensity.sum()
-    # dAint = Aint**0.5
     resultDF = pd.DataFrame([[A3s, dA3s,
         modelDF.A.Value.values[0]*binPerHz, modelDF.A.Uncertainty.values[0]*binPerHz,
         modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0],
