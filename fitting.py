@@ -6,14 +6,16 @@ import matplotlib.pyplot as plt
 import scipy.constants as cts
 import satlas as sat
 from uncertainties import ufloat
+import uncertainties.unumpy as unp
 
 magneticField = 4.48 # in mT
 isotope = 'Xe129' # choose between H1, H2, Xe129, Xe131, Xe133, Xe129m, Xe131m, Xe133m
 
-main_dir = 'C:\\Users\\quentin.rogliard\\OneDrive - HESSO\\Documents\\GitHub\\NMRfit'
+# main_dir = 'C:\\Users\\quentin.rogliard\\OneDrive - HESSO\\Documents\\GitHub\\NMRfit'
+main_dir = '/Users/akanellako/Documents/NMR_data'
 fileName = 'fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.txt'
 
-def larmorFrequency(magneticField, isotope):
+def gyromagneticRatio(isotope):
     if isotope == 'H1':
         magneticMoment = ufloat(2.792847351, 0.000000009)  # in nuclear magnetons
         nucSpin = 1/2
@@ -43,9 +45,35 @@ def larmorFrequency(magneticField, isotope):
 
     gyromagneticRatio = (ufloat(cts.physical_constants['nuclear magneton'][0], cts.physical_constants['nuclear magneton'][2])/ufloat(cts.physical_constants['reduced Planck constant'][0], cts.physical_constants['reduced Planck constant'][2])) * gFactor * (1e-6)/(2*math.pi)
 
-    larmorFrequency = gyromagneticRatio * ufloat(magneticField, 0.005)
+    return gyromagneticRatio, nucSpin
 
-    return abs(larmorFrequency) 
+def larmorFrequency(magneticField, isotope):
+
+    larmorFrequency = gyromagneticRatio(isotope)[0] * ufloat(magneticField, 0.005)
+
+    return abs(larmorFrequency)
+
+def sphereVolume(radius):
+
+    volume = (4/3) * math.pi * (radius**3)
+
+    return volume
+
+def nbAtomsIdealGas(pressure, volume, temperature):
+
+    nbAtoms = 1e2 * 1e-6 * pressure * volume / (ufloat(cts.physical_constants['Boltzmann constant'][0], cts.physical_constants['Boltzmann constant'][2]) * temperature)
+
+    return nbAtoms
+
+def protonThermalPolarisation(magneticField, temperature):
+
+    protonMagneticMoment = ufloat(1.41060679545e-26, 0.00000000060e-26) # in J/T
+    polarisation = (protonMagneticMoment * ufloat(magneticField, 0.005) * 1e-3) / (ufloat(cts.physical_constants['Boltzmann constant'][0], cts.physical_constants['Boltzmann constant'][2]) * temperature)
+    polarisation = unp.tanh(polarisation)
+
+    return polarisation
+
+# def polarisation()
 
 def NMRPeakModel(x, par):
 
@@ -115,53 +143,52 @@ def main(dataDir, resultDir, fileName):
     modelDF = model.get_result_frame()
 
     binPerHz = len(fitDF)/(fitDF.frequency.max()-fitDF.frequency.min())
-    diff = fLarmor - ufloat(modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0],)
+    diff = fLarmor - ufloat(modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0])
     maxInt = model(fitDF.frequency.values[0])
     
     #Polarisation Calculation
-    
-    P_H1 = 4.24e-9
-    A_H1 = 1.1e6/1000
-    GR_H1 = 42.57638474
-    Nb_at_H1 = 3.73544E+23
-    I_H1 = 1/2
-    GR_Xe129 = 11.777
-    Nb_at_Xe129 = 3.55525E+18
-    I_Xe129 = 1/2
-    
-    Polarisation = P_H1 * (modelDF.A.Value.values[0]/A_H1) * (Nb_at_H1 / Nb_at_Xe129) * (GR_H1 / GR_Xe129) * (I_H1 / I_Xe129) 
-
-    # fit5sDF = fitDF.loc[(fitDF['frequency'] < upper5s)].std()
-
-    # if modelDF.FWHM.Value.values[0] > 120.:
-    #     lower5s = modelDF.mu.Value.values[0]-6*modelDF.FWHM.Value.values[0]
-    #     upper5s = modelDF.mu.Value.values[0]+6*modelDF.FWHM.Value.values[0]
-    #     fit5sDF = fitDF.loc[(fitDF['frequency'] > lower5s) & (fitDF['frequency'] < upper5s)].reset_index(drop = True)
-    #     A5s = fit5sDF.intensity.sum()
-    #     dA5s = A5s**0.5
-    # else:
-    #     A5s = np.nan
-    #     dA5s = np.nan
-
     if isotope != 'H1':
-        print('con')
+        waterMolarMass = ufloat(18.01528, 0.00033)
+        pressure = 0.264 * ufloat(100, 10) # in mbar
+        temperature = 300 # in Kelvin
+        volume = sphereVolume(ufloat(1.1, 0.005)) # in cm2, radius in cm
+        polarisation_H1 = protonThermalPolarisation(1.25, temperature)
+        A_H1 = 1.1e6/1000
+        gyromagneticRatio_H1 = gyromagneticRatio('H1')[0].nominal_value
+        nbAtoms_H1 = 2 * volume * (1/waterMolarMass) * ufloat(cts.physical_constants['Avogadro constant'][0], cts.physical_constants['Avogadro constant'][2])
+        nucSpin_H1 = gyromagneticRatio('H1')[1]
+        gyromagneticRatio_Xe129 = gyromagneticRatio(isotope)[0].nominal_value
+        nbAtoms_Xe129 = nbAtomsIdealGas(pressure, volume, temperature)
+        nucSpin_Xe129 = gyromagneticRatio(isotope)[1]
 
-    A3s = fitDF[(fitDF['frequency'] >= 52000) & (fitDF['frequency'] <= 54000)]
-    A3s = A3s.intensity.sum()
-    # A3s = np.nan
-    dA3s = np.nan
+        polarisation = polarisation_H1 * (modelDF.A.Value.values[0]/A_H1) * (nbAtoms_H1 / nbAtoms_Xe129) * (gyromagneticRatio_H1 / gyromagneticRatio_Xe129) * (nucSpin_H1 / nucSpin_Xe129) 
+        print(polarisation)
+
+    if 2*modelDF.gamma.Value.values[0] > 120.:
+        lower3s = modelDF.mu.Value.values[0]-6*modelDF.gamma.Value.values[0]
+        upper3s = modelDF.mu.Value.values[0]+6*modelDF.gamma.Value.values[0]
+        fit3sDF = fitDF.loc[(fitDF['frequency'] > lower3s) & (fitDF['frequency'] < upper3s)].reset_index(drop = True)
+        A3s = fit3sDF.intensity.sum()
+        dA3s = A3s**0.5
+    else:
+        A3s = np.nan
+        dA3s = np.nan
+
+    # Aint = fitDF[(fitDF['frequency'] >= 52000) & (fitDF['frequency'] <= 54000)]
+    # Aint = A3s.intensity.sum()
+    # dAint = Aint**0.5
     resultDF = pd.DataFrame([[A3s, dA3s,
         modelDF.A.Value.values[0]*binPerHz, modelDF.A.Uncertainty.values[0]*binPerHz,
         modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0],
         2*modelDF.gamma.Value.values[0], 2*modelDF.gamma.Uncertainty.values[0],
         modelDF.a0.Value.values[0], modelDF.a0.Uncertainty.values[0],
-        modelDF.a1.Value.values[0], modelDF.a1.Uncertainty.values[0], Polarisation,
-        fLarmor.nominal_value, fLarmor.std_dev, diff.nominal_value, diff.std_dev, maxInt,
+        modelDF.a1.Value.values[0], modelDF.a1.Uncertainty.values[0],
+        fLarmor.nominal_value, fLarmor.std_dev, diff.nominal_value, diff.std_dev, maxInt, polarisation.nominal_value, polarisation.std_dev,
         modelDF.Chisquare.values[0], modelDF.NDoF.values[0], float(modelDF.Chisquare.values[0]/modelDF.NDoF.values[0])]],
         columns=['A3s', 'dA3s','A', 'dA',
                 'mu', 'dmu', 'FWHM', 'dFWHM', 
-                'a0', 'da0', 'a1', 'da1','Polarisation',
-                'fLarmor', 'dfLarmor', 'diffLarmor', 'ddiffLarmor', 'maxIntensity',
+                'a0', 'da0', 'a1', 'da1',
+                'fLarmor', 'dfLarmor', 'diffLarmor', 'ddiffLarmor', 'maxIntensity', 'polarisation', 'dpolarisation',
                 'Chi2', 'NDoF', 'Red. Chi2'])
 
     resultDF = resultDF.reset_index(drop = True)
