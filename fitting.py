@@ -13,7 +13,7 @@ isotope = 'Xe129' # choose between H1, H2, Xe129, Xe131, Xe133, Xe129m, Xe131m, 
 
 # main_dir = 'C:\\Users\\quentin.rogliard\\OneDrive - HESSO\\Documents\\GitHub\\NMRfit'
 main_dir = '/Users/akanellako/Documents/NMR_data'
-fileName = 'fft-one_shot_120s_laseroff_120deg_full_polarisation.txt'
+fileName = 'fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.txt'
 
 def gyromagneticRatio(isotope):
     if isotope == 'H1':
@@ -103,7 +103,8 @@ def main(dataDir, resultDir, fileName):
 
     fitFile = os.path.join(resultDir, 'fit_{}.csv'.format(fileName[:-4]))
     resultFile = os.path.join(resultDir, '{}.csv'.format(fileName[:-4]))
-    resultGraph = os.path.join(resultDir, '{}.png'.format(fileName[:-4]))
+    resultGraph1 = os.path.join(resultDir, '{}_simple.png'.format(fileName[:-4]))
+    resultGraph2 = os.path.join(resultDir, '{}_residuals.png'.format(fileName[:-4]))
 
     inDF = pd.read_csv(dataFile, delimiter=' ', header=None)
     inDF.columns = ['frequency', 'intensity']
@@ -140,8 +141,6 @@ def main(dataDir, resultDir, fileName):
     success, message = sat.chisquare_fit(model, fitDF.frequency.to_numpy(), fitDF.intensity.to_numpy(), yerr=fitDF.intensityUnc.to_numpy())
     modelDF = model.get_result_frame()
 
-    band = sat.create_band(model, x=modelFrequency, x_data=fitDF.frequency, y_data=fitDF.intensity, yerr=fitDF.intensityUnc, xerr=None, method='chisquare', kind='confidence')
-
     binPerHz = len(fitDF)/(fitDF.frequency.max()-fitDF.frequency.min())
     diff = fLarmor - ufloat(modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0])
     maxInt = model(fitDF.frequency.values[0])
@@ -150,7 +149,7 @@ def main(dataDir, resultDir, fileName):
     if isotope != 'H1':
         waterMolarMass = ufloat(18.01528, 0.00033)
         pressure = 0.264 * ufloat(100, 10) # in mbar
-        temperature = 300 # in Kelvin
+        temperature = ufloat(300, 3) # in Kelvin
         volume = sphereVolume(ufloat(1.1, 0.005)) # in cm2, radius in cm
         polarisation_H1 = protonThermalPolarisation(1.25, temperature)
         A_H1 = ufloat(np.mean([1296.2079525436134, 1208.850679785642]),np.std([1296.2079525436134, 1208.850679785642]))
@@ -196,16 +195,42 @@ def main(dataDir, resultDir, fileName):
     resultDF = resultDF.reset_index(drop = True)
     resultDF.to_csv(resultFile, index = False)
 
+    band = sat.create_band(model, x=modelFrequency, x_data=fitDF.frequency, y_data=fitDF.intensity, yerr=fitDF.intensityUnc, xerr=None, method='chisquare', kind='confidence')
+    residuals = (fitDF.intensity.values - model.seperate_response(fitDF.frequency.values)) / fitDF.intensityUnc.values
+    residualsMean = ufloat(residuals[0].mean(), residuals[0].std())
+
     plt.figure(dpi = 200)
     plt.errorbar(fitDF.frequency, fitDF.intensity, yerr=(fitDF.intensityUnc), label = 'FFT', fmt='.', zorder=5)
     plt.plot(modelFrequency, model(modelFrequency), label = 'Fit', linestyle = '-', zorder=3)
     plt.fill_between(modelFrequency, model(modelFrequency)-band, model(modelFrequency)+band, alpha=0.33, color='tab:orange') #C0392B #16A085
-    plt.plot([fLarmor.nominal_value, fLarmor.nominal_value], [fitDF.intensity.min(), fitDF.intensity.max()], label = '$f_{L}$', linestyle='--', zorder=1)
-    plt.plot([modelDF.mu.Value.values[0], modelDF.mu.Value.values[0]], [fitDF.intensity.min(), fitDF.intensity.max()], label = 'Fit CoG', linestyle='--', zorder=1)
+    plt.axvline(fLarmor.nominal_value, label = '$f_{L}$', linestyle='--', zorder=1)
+    plt.axvline(modelDF.mu.Value.values[0], label = 'Fit CoG', linestyle='--', zorder=1)
     plt.legend(loc='upper right')
     plt.xlabel('Frequence [Hz]')
     plt.ylabel('Intensity [a.u.]')
-    plt.savefig(resultGraph)
+    plt.savefig(resultGraph1)
+
+    fig, ax = plt.subplots(1, 1, dpi=200)
+    ax1 = plt.subplot2grid((5,1), (0,0), rowspan=4)
+    ax2 = plt.subplot2grid((5,1), (4,0), sharex=ax1)
+    ax1.errorbar(fitDF.frequency, fitDF.intensity, yerr=(fitDF.intensityUnc), label = 'FFT', fmt='.', zorder=5)
+    ax1.plot(modelFrequency, model(modelFrequency), label = 'Fit', linestyle = '-', zorder=3)
+    ax1.fill_between(modelFrequency, model(modelFrequency)-band, model(modelFrequency)+band, alpha=0.33, color='tab:orange') #C0392B #16A085
+    ax1.axvline(fLarmor.nominal_value, label = '$f_{L}$', linestyle='--', color='tab:green', zorder=1)
+    ax1.axvline(modelDF.mu.Value.values[0], label = 'Fit CoG', linestyle='--', color='tab:red', zorder=1)
+    # ax1.tick_params(axis='x', which='both', length=0)
+    ax1.set_ylabel('Intensity [a.u.]')
+    ax1.legend()
+    # ---
+    ax2.plot(fitDF.frequency, residuals[0], '.', color='k')
+    ax2.axhline(residualsMean.nominal_value, label='{:.1f}$\pm${:.1f} $\sigma$'.format(residualsMean.nominal_value, residualsMean.std_dev), color='red', linestyle='--')
+    ax2.set_xlabel('Frequence [Hz]')
+    ax2.set_ylabel('Residuals [$\sigma$]')
+    ax2.legend()
+    plt.tight_layout()
+    plt.setp(ax1.get_xticklabels(), visible=False)
+    fig.subplots_adjust(hspace=0)
+    plt.savefig(resultGraph2)
 
 #%% Main
 
