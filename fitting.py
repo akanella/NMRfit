@@ -13,7 +13,7 @@ isotope = 'Xe129' # choose between H1, H2, Xe129, Xe131, Xe133, Xe129m, Xe131m, 
 
 # main_dir = 'C:\\Users\\quentin.rogliard\\OneDrive - HESSO\\Documents\\GitHub\\NMRfit'
 main_dir = '/Users/akanellako/Documents/NMR_data'
-fileName = 'fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.txt'
+fileName = 'fft-one_shot_120s_laseroff_120deg_full_polarisation.txt'
 
 def gyromagneticRatio(isotope):
     if isotope == 'H1':
@@ -140,6 +140,8 @@ def main(dataDir, resultDir, fileName):
     success, message = sat.chisquare_fit(model, fitDF.frequency.to_numpy(), fitDF.intensity.to_numpy(), yerr=fitDF.intensityUnc.to_numpy())
     modelDF = model.get_result_frame()
 
+    band = sat.create_band(model, x=modelFrequency, x_data=fitDF.frequency, y_data=fitDF.intensity, yerr=fitDF.intensityUnc, xerr=None, method='chisquare', kind='confidence')
+
     binPerHz = len(fitDF)/(fitDF.frequency.max()-fitDF.frequency.min())
     diff = fLarmor - ufloat(modelDF.mu.Value.values[0], modelDF.mu.Uncertainty.values[0])
     maxInt = model(fitDF.frequency.values[0])
@@ -197,6 +199,7 @@ def main(dataDir, resultDir, fileName):
     plt.figure(dpi = 200)
     plt.errorbar(fitDF.frequency, fitDF.intensity, yerr=(fitDF.intensityUnc), label = 'FFT', fmt='.', zorder=5)
     plt.plot(modelFrequency, model(modelFrequency), label = 'Fit', linestyle = '-', zorder=3)
+    plt.fill_between(modelFrequency, model(modelFrequency)-band, model(modelFrequency)+band, alpha=0.33, color='tab:orange') #C0392B #16A085
     plt.plot([fLarmor.nominal_value, fLarmor.nominal_value], [fitDF.intensity.min(), fitDF.intensity.max()], label = '$f_{L}$', linestyle='--', zorder=1)
     plt.plot([modelDF.mu.Value.values[0], modelDF.mu.Value.values[0]], [fitDF.intensity.min(), fitDF.intensity.max()], label = 'Fit CoG', linestyle='--', zorder=1)
     plt.legend(loc='upper right')
