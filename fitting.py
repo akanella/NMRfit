@@ -101,10 +101,9 @@ def main(dataDir, resultDir, fileName):
     except FileExistsError: pass
     os.chdir(resultDir)
 
-    fitFile = os.path.join(resultDir, 'fit_{}.csv'.format(fileName[:-4]))
-    resultFile = os.path.join(resultDir, '{}.csv'.format(fileName[:-4]))
-    resultGraph1 = os.path.join(resultDir, '{}_simple.png'.format(fileName[:-4]))
-    resultGraph2 = os.path.join(resultDir, '{}_residuals.png'.format(fileName[:-4]))
+    resultFile = os.path.join(resultDir, '{}{}.csv'.format(fileName[:-4], '{}'))
+    walkFile = os.path.join(resultDir, '{}.h5'.format(fileName[:-4]))
+    resultGraph = os.path.join(resultDir, '{}{}.png'.format(fileName[:-4], '{}'))
 
     inDF = pd.read_csv(dataFile, delimiter=' ', header=None)
     inDF.columns = ['frequency', 'intensity']
@@ -121,7 +120,7 @@ def main(dataDir, resultDir, fileName):
     std = cDF.intensity.std()
     fitDF['SNR'] = fitDF.intensity.abs()/std
     fitDF['intensityUnc'] = fitDF.intensity/fitDF.SNR
-    fitDF.to_csv(fitFile, index = False)
+    fitDF.to_csv(resultFile.format('_spectrum'), index = False)
     modelFrequency = np.arange(fitDF.frequency.min(), fitDF.frequency.max()+50, 50)
 
     # Initialisation of model parameters
@@ -139,6 +138,23 @@ def main(dataDir, resultDir, fileName):
                             'mu': {'min': 0.}})
 
     success, message = sat.chisquare_fit(model, fitDF.frequency.to_numpy(), fitDF.intensity.to_numpy(), yerr=fitDF.intensityUnc.to_numpy())
+    model.display_chisquare_fit()
+
+    band = sat.create_band(model, x=modelFrequency, x_data=fitDF.frequency, y_data=fitDF.intensity, yerr=fitDF.intensityUnc, xerr=None, method='chisquare', kind='confidence')
+    residuals = (fitDF.intensity.values - model.seperate_response(fitDF.frequency.values)) / fitDF.intensityUnc.values
+    residualsMean = ufloat(residuals[0].mean(), residuals[0].std())
+
+    # success, message = sat.likelihood_fit(model, fitDF.frequency.to_numpy(), fitDF.intensity.to_numpy(), hessian=False, walking=True, walk_kws={'filename':walkFile, 'nsteps': 1e3, 'walkers': 60})
+    # model.display_chisquare_fit()
+
+    # sat.process_walk(model, walkFile)
+    # fig, ax, cb = sat.generate_correlation_plot(walkFile)
+    # fig, ax = sat.generate_walk_plot(walkFile, selection=[1,100])
+    # fig.savefig(resultGraph.format('_walk'))
+
+    # fig, ax, cb = sat.generate_correlation_map(model, fitDF.frequency.tolist(), fitDF.intensity.tolist(), method='chisquare', distance=5)
+    # fig.savefig(resultGraph.format('correlation'))
+
     modelDF = model.get_result_frame()
 
     binPerHz = len(fitDF)/(fitDF.frequency.max()-fitDF.frequency.min())
@@ -193,11 +209,7 @@ def main(dataDir, resultDir, fileName):
                 'Chi2', 'NDoF', 'Red. Chi2'])
 
     resultDF = resultDF.reset_index(drop = True)
-    resultDF.to_csv(resultFile, index = False)
-
-    band = sat.create_band(model, x=modelFrequency, x_data=fitDF.frequency, y_data=fitDF.intensity, yerr=fitDF.intensityUnc, xerr=None, method='chisquare', kind='confidence')
-    residuals = (fitDF.intensity.values - model.seperate_response(fitDF.frequency.values)) / fitDF.intensityUnc.values
-    residualsMean = ufloat(residuals[0].mean(), residuals[0].std())
+    resultDF.to_csv(resultFile.format(''), index = False)
 
     plt.figure(dpi = 200)
     plt.errorbar(fitDF.frequency, fitDF.intensity, yerr=(fitDF.intensityUnc), label = 'FFT', fmt='.', zorder=5)
@@ -208,7 +220,7 @@ def main(dataDir, resultDir, fileName):
     plt.legend(loc='upper right')
     plt.xlabel('Frequence [Hz]')
     plt.ylabel('Intensity [a.u.]')
-    plt.savefig(resultGraph1)
+    plt.savefig(resultGraph.format('_simple'))
 
     fig, ax = plt.subplots(1, 1, dpi=200)
     ax1 = plt.subplot2grid((5,1), (0,0), rowspan=4)
@@ -230,7 +242,7 @@ def main(dataDir, resultDir, fileName):
     plt.tight_layout()
     plt.setp(ax1.get_xticklabels(), visible=False)
     fig.subplots_adjust(hspace=0)
-    plt.savefig(resultGraph2)
+    plt.savefig(resultGraph.format('_residuals'))
 
 #%% Main
 
