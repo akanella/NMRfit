@@ -13,7 +13,13 @@ isotope = 'Xe129' # choose between H1, H2, Xe129, Xe131, Xe133, Xe129m, Xe131m, 
 
 # main_dir = 'C:\\Users\\quentin.rogliard\\OneDrive - HESSO\\Documents\\GitHub\\NMRfit'
 main_dir = '/Users/akanellako/Documents/NMR_data'
-fileName = 'fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.txt'
+
+# fileNames = ['fft-one_shot_0s_laseroff_120deg_full_polarisation.txt',
+#                 'fft-one_shot_10s_laseroff_120deg_full_polarisation.txt',
+#                 'fft-one_shot_30s_laseroff_120deg_full_polarisation.txt',
+#                 'fft-one_shot_60s_laseroff_120deg_full_polarisation.txt',
+#                 'fft-one_shot_90s_laseroff_120deg_full_polarisation.txt',
+#                 'fft-one_shot_120s_laseroff_120deg_full_polarisation.txt']
 
 def gyromagneticRatio(isotope):
     if isotope == 'H1':
@@ -134,8 +140,17 @@ def main(dataDir, resultDir, fileName):
     model = sat.MiscModel(NMRPeakModel, init, ['A', 'mu', 'gamma', 'a0', 'a1'])
     model.set_boundaries({'a0': {'min': 0.},
                             'A': {'min': 0.},
-                            'gamma': {'min': 60.},
+                            'gamma': {'min': 20.},
                             'mu': {'min': 0.}})
+
+    plt.figure(dpi = 200)
+    plt.errorbar(fitDF.frequency, fitDF.intensity, yerr=(fitDF.intensityUnc), label = 'data', fmt='.', zorder=5)
+    plt.plot(modelFrequency, model(modelFrequency), label = 'init fit', linestyle = '-', zorder=3)
+    plt.legend(loc='upper right')
+    plt.xlabel('Frequence [Hz]')
+    plt.ylabel('Intensity [a.u.]')
+    # plt.show()
+    plt.close()
 
     success, message = sat.chisquare_fit(model, fitDF.frequency.to_numpy(), fitDF.intensity.to_numpy(), yerr=fitDF.intensityUnc.to_numpy())
     model.display_chisquare_fit()
@@ -214,22 +229,23 @@ def main(dataDir, resultDir, fileName):
     plt.figure(dpi = 200)
     plt.errorbar(fitDF.frequency, fitDF.intensity, yerr=(fitDF.intensityUnc), label = 'FFT', fmt='.', zorder=5)
     plt.plot(modelFrequency, model(modelFrequency), label = 'Fit', linestyle = '-', zorder=3)
-    plt.fill_between(modelFrequency, model(modelFrequency)-band, model(modelFrequency)+band, alpha=0.33, color='tab:orange') #C0392B #16A085
-    plt.axvline(fLarmor.nominal_value, label = '$f_{L}$', linestyle='--', zorder=1)
-    plt.axvline(modelDF.mu.Value.values[0], label = 'Fit CoG', linestyle='--', zorder=1)
+    plt.fill_between(modelFrequency, model(modelFrequency)-band, model(modelFrequency)+band, alpha=0.33, color='tab:orange')
+    plt.axvline(fLarmor.nominal_value, label = '$f_{L}$', linestyle='--', color='tab:green', zorder=1)
+    plt.axvline(modelDF.mu.Value.values[0], label = 'Fit CoG', linestyle='--', color='tab:red', zorder=1)
     plt.legend(loc='upper right')
     plt.xlabel('Frequence [Hz]')
     plt.ylabel('Intensity [a.u.]')
     plt.savefig(resultGraph.format('_simple'))
+    plt.close()
 
     fig, ax = plt.subplots(1, 1, dpi=200)
     ax1 = plt.subplot2grid((5,1), (0,0), rowspan=4)
     ax2 = plt.subplot2grid((5,1), (4,0), sharex=ax1)
     ax1.errorbar(fitDF.frequency, fitDF.intensity, yerr=(fitDF.intensityUnc), label = 'FFT', fmt='.', zorder=5)
     ax1.plot(modelFrequency, model(modelFrequency), label = 'Fit', linestyle = '-', zorder=3)
-    ax1.fill_between(modelFrequency, model(modelFrequency)-band, model(modelFrequency)+band, alpha=0.33, color='tab:orange') #C0392B #16A085
-    ax1.axvline(fLarmor.nominal_value, label = '$f_{L}$', linestyle='--', color='tab:green', zorder=1)
-    ax1.axvline(modelDF.mu.Value.values[0], label = 'Fit CoG', linestyle='--', color='tab:red', zorder=1)
+    ax1.fill_between(modelFrequency, model(modelFrequency)-band, model(modelFrequency)+band, alpha=0.33, color='tab:orange')
+    # ax1.axvline(fLarmor.nominal_value, label = '$f_{L}$', linestyle='--', color='tab:green', zorder=1)
+    # ax1.axvline(modelDF.mu.Value.values[0], label = 'Fit CoG', linestyle='--', color='tab:red', zorder=1)
     # ax1.tick_params(axis='x', which='both', length=0)
     ax1.set_ylabel('Intensity [a.u.]')
     ax1.legend()
@@ -239,10 +255,14 @@ def main(dataDir, resultDir, fileName):
     ax2.set_xlabel('Frequence [Hz]')
     ax2.set_ylabel('Residuals [$\sigma$]')
     ax2.legend()
+    plt.xlim([50000, 56000])
     plt.tight_layout()
     plt.setp(ax1.get_xticklabels(), visible=False)
     fig.subplots_adjust(hspace=0)
     plt.savefig(resultGraph.format('_residuals'))
+    plt.close()
+
+    return fitDF
 
 #%% Main
 
@@ -257,6 +277,27 @@ def main(dataDir, resultDir, fileName):
 data_dir = os.path.join(main_dir, 'data')
 result_dir = os.path.join(main_dir, 'result')
 
-main(data_dir, result_dir, fileName)
+if len(fileNames) > 1:
+    i = 0
+    plt.figure(dpi = 200)
+
+    for fileName in fileNames:
+            
+            mainDF = main(data_dir, result_dir, fileName)
+
+            plt.errorbar(mainDF.frequency, mainDF.intensity, yerr=(mainDF.intensityUnc), label=fileName, fmt='.-')
+
+            i+=1
+
+    plt.legend(loc='upper right')
+    plt.xlabel('Frequence [Hz]')
+    plt.ylabel('Intensity [a.u.]')
+    plt.xlim([50000, 56000])
+    plt.savefig(result_dir + '/all.png')
+
+else:
+    fileName = fileNames[0]
+    main(data_dir, result_dir, fileName)
+
 
 

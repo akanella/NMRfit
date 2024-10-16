@@ -31,3 +31,5 @@ data/fft-TEST5_spherical_129Xe_2min_10pts_4000mV_391us_2.81A.txt
 /result
 transfer.py
 /transfer
+/T1
+/fit_T1
